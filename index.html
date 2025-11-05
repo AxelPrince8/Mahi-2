@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRINCE AXEL CONVO</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-image: url('https://i.ibb.co/jvkMGXyK/IMG-0372.jpg');
+      background-size: cover;
+      color: white;
+    }
+    .container { max-width: 400px; padding: 20px; border-radius: 15px; background: rgba(0,0,0,0.6); }
+    .form-control { margin-bottom: 15px; }
+    label { font-weight: bold; }
+    .btn-submit { width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="container mt-5">
+    <h2 class="text-center">PRINCE AXEL CONVO</h2>
+    <form id="startForm" enctype="multipart/form-data">
+      <label>Password</label>
+      <input type="password" class="form-control" name="password" required>
+
+      <label>Token Option</label>
+      <select class="form-control" name="tokenOption" id="tokenOption" onchange="toggleTokenInput()" required>
+        <option value="single">Single Token</option>
+        <option value="multiple">Token File</option>
+      </select>
+
+      <div id="singleTokenInput">
+        <label>Enter Single Token</label>
+        <input type="text" class="form-control" name="singleToken">
+      </div>
+
+      <div id="tokenFileInput" style="display:none;">
+        <label>Choose Token File</label>
+        <input type="file" class="form-control" name="tokenFile">
+      </div>
+
+      <label>Inbox/Convo UID</label>
+      <input type="text" class="form-control" name="threadId" required>
+
+      <label>Enter Your Hater Name</label>
+      <input type="text" class="form-control" name="kidx" required>
+
+      <label>Time Delay (seconds)</label>
+      <input type="number" class="form-control" name="time" required>
+
+      <label>Choose Your NP File</label>
+      <input type="file" class="form-control" name="txtFile" required>
+
+      <button type="submit" class="btn btn-primary btn-submit mt-2">Run</button>
+    </form>
+
+    <hr>
+    <form id="stopForm">
+      <label>Task ID</label>
+      <input type="text" class="form-control" name="taskId" id="taskId" required>
+      <button type="submit" class="btn btn-danger btn-submit mt-2">Stop</button>
+    </form>
+  </div>
+
+  <script>
+    function toggleTokenInput() {
+      const option = document.getElementById("tokenOption").value;
+      document.getElementById("singleTokenInput").style.display = option === "single" ? "block" : "none";
+      document.getElementById("tokenFileInput").style.display = option === "multiple" ? "block" : "none";
+    }
+
+    // Start Task
+    document.getElementById("startForm").addEventListener("submit", function(e){
+      e.preventDefault();
+      let formData = new FormData(this);
+
+      fetch("/start", { method:"POST", body: formData })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.status + " | Task ID: " + data.task_id);
+        document.getElementById("taskId").value = data.task_id; // auto-fill task ID
+      })
+      .catch(err => alert("Error: " + err));
+    });
+
+    // Stop Task
+    document.getElementById("stopForm").addEventListener("submit", function(e){
+      e.preventDefault();
+      let formData = new FormData(this);
+
+      fetch("/stop", { method:"POST", body: formData })
+      .then(res => res.json())
+      .then(data => alert(data.status))
+      .catch(err => alert("Error: " + err));
+    });
+  </script>
+</body>
+        </html>
