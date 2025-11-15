@@ -138,6 +138,16 @@ def stop_task():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+# ✅ Add this route for live logs
+@app.route("/logs")
+def get_logs():
+    if os.path.exists("restart_log.txt"):
+        with open("restart_log.txt", "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            # return last 200 lines for performance
+            return "".join(lines[-200:])
+    return ""
+
 def monitor_server():
     while True:
         time.sleep(120)
