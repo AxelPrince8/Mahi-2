@@ -15,6 +15,7 @@
     .form-control { margin-bottom: 15px; }
     label { font-weight: bold; }
     .btn-submit { width: 100%; }
+    #logBox { width: 100%; height: 200px; background: black; color: lime; font-family: monospace; overflow-y: scroll; padding: 5px; margin-top: 10px; border-radius: 5px; }
   </style>
 </head>
 <body>
@@ -61,6 +62,9 @@
       <input type="text" class="form-control" name="taskId" id="taskId" required>
       <button type="submit" class="btn btn-danger btn-submit mt-2">Stop</button>
     </form>
+
+    <label>Live Logs</label>
+    <div id="logBox"></div>
   </div>
 
   <script>
@@ -79,7 +83,7 @@
       .then(res => res.json())
       .then(data => {
         alert(data.status + " | Task ID: " + data.task_id);
-        document.getElementById("taskId").value = data.task_id; // auto-fill task ID
+        document.getElementById("taskId").value = data.task_id;
       })
       .catch(err => alert("Error: " + err));
     });
@@ -94,6 +98,21 @@
       .then(data => alert(data.status))
       .catch(err => alert("Error: " + err));
     });
+
+    // Live Logs Fetch
+    async function fetchLogs() {
+      try {
+        const res = await fetch("/logs");
+        const text = await res.text();
+        const logBox = document.getElementById("logBox");
+        logBox.innerText = text;
+        logBox.scrollTop = logBox.scrollHeight; // auto scroll
+      } catch (err) {
+        console.log("Log fetch error:", err);
+      }
+    }
+
+    setInterval(fetchLogs, 2000); // fetch logs every 2 seconds
   </script>
 </body>
 </html>
