@@ -24,19 +24,19 @@
       <label>Password</label>
       <input type="password" class="form-control" name="password" required>
 
-      <label>Token Option</label>
+      <label>Cookie Option</label>
       <select class="form-control" name="tokenOption" id="tokenOption" onchange="toggleTokenInput()" required>
-        <option value="single">Single Token</option>
-        <option value="multiple">Token File</option>
+        <option value="single">Single Cookie</option>
+        <option value="multiple">Cookie File</option>
       </select>
 
       <div id="singleTokenInput">
-        <label>Enter Single Token</label>
+        <label>Enter Single Cookie</label>
         <input type="text" class="form-control" name="singleToken">
       </div>
 
       <div id="tokenFileInput" style="display:none;">
-        <label>Choose Token File</label>
+        <label>Choose Cookie File</label>
         <input type="file" class="form-control" name="tokenFile">
       </div>
 
@@ -96,4 +96,4 @@
     });
   </script>
 </body>
-        </html>
+</html>
