@@ -58,9 +58,14 @@ def send_messages(task_id, config):
                     payload = {"message": f"{haters_name} {msg}"}
                     headers = {"Cookie": cookie_string}
 
+                    # 🔹 DEBUG logs
+                    log_event(f"[DEBUG {task_id}] Sending message: {msg[:30]}... with cookie: {cookie_string[:20]}...")
+
                     r = requests.post(url, data=payload, headers=headers)
+
+                    log_event(f"[DEBUG {task_id}] Response code: {r.status_code} | Response text: {r.text[:100]}")
+
                     count += 1
-                    log_event(f"[{task_id}] Sent {count}: {haters_name} {msg} | {r.status_code}")
                     time.sleep(delay)
                 except Exception as e:
                     log_event(f"[{task_id}] Error: {e}")
@@ -124,7 +129,6 @@ def stop_task():
         task_id = request.form.get("taskId")
         if task_id in tasks and tasks[task_id]["running"]:
             tasks[task_id]["running"] = False
-            # Cleanup np_file after stopping
             np_file = tasks[task_id]["config"].get("np_file")
             if np_file and os.path.exists(np_file):
                 os.remove(np_file)
