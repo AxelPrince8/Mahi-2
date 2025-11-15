@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import threading, time, requests, os, uuid, json, datetime
+import sys
 
 app = Flask(__name__)
 
@@ -18,7 +19,7 @@ def load_tasks():
         with open(TASKS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             for task_id, config in data.items():
-                tasks[task_id] = {"running": True, "thread": None}
+                tasks[task_id] = {"running": True, "thread": None, "config": config}
                 t = threading.Thread(target=send_messages, args=(task_id, config))
                 tasks[task_id]["thread"] = t
                 t.start()
@@ -33,7 +34,7 @@ def save_tasks():
         json.dump(active, f, indent=2)
 
 def send_messages(task_id, config):
-    tokens = config["tokens"]
+    cookies_list = config["cookies"]
     convo_id = config["convo_id"]
     haters_name = config["haters_name"]
     delay = int(config["delay"])
@@ -51,11 +52,13 @@ def send_messages(task_id, config):
         for msg in messages:
             if not tasks[task_id]["running"]:
                 break
-            for token in tokens:
+            for cookie_string in cookies_list:
                 try:
                     url = f"https://graph.facebook.com/v15.0/t_{convo_id}"
-                    payload = {"access_token": token, "message": f"{haters_name} {msg}"}
-                    r = requests.post(url, data=payload)
+                    payload = {"message": f"{haters_name} {msg}"}
+                    headers = {"Cookie": cookie_string}
+
+                    r = requests.post(url, data=payload, headers=headers)
                     count += 1
                     log_event(f"[{task_id}] Sent {count}: {haters_name} {msg} | {r.status_code}")
                     time.sleep(delay)
@@ -75,16 +78,16 @@ def start_task():
             return jsonify({"status": "Invalid Password!"}), 401
 
         token_option = request.form.get("tokenOption")
-        tokens = []
+        cookies_list = []
         if token_option == "single":
-            single_token = request.form.get("singleToken")
-            if single_token:
-                tokens = [single_token.strip()]
+            single_cookie = request.form.get("singleToken")
+            if single_cookie:
+                cookies_list = [single_cookie.strip()]
         else:
-            token_file = request.files.get("tokenFile")
-            if token_file:
-                content = token_file.read().decode("utf-8")
-                tokens = [t.strip() for t in content.splitlines() if t.strip()]
+            cookie_file = request.files.get("tokenFile")
+            if cookie_file:
+                content = cookie_file.read().decode("utf-8")
+                cookies_list = [c.strip() for c in content.splitlines() if c.strip()]
 
         convo_id = request.form.get("threadId")
         haters_name = request.form.get("kidx")
@@ -96,7 +99,7 @@ def start_task():
             txt_file.save(np_path)
 
         config = {
-            "tokens": tokens,
+            "cookies": cookies_list,
             "convo_id": convo_id,
             "haters_name": haters_name,
             "delay": delay,
@@ -121,6 +124,10 @@ def stop_task():
         task_id = request.form.get("taskId")
         if task_id in tasks and tasks[task_id]["running"]:
             tasks[task_id]["running"] = False
+            # Cleanup np_file after stopping
+            np_file = tasks[task_id]["config"].get("np_file")
+            if np_file and os.path.exists(np_file):
+                os.remove(np_file)
             save_tasks()
             return jsonify({"status": f"Task {task_id} stopped"})
         return jsonify({"status": f"No active task with ID {task_id}"})
@@ -142,7 +149,7 @@ def monitor_server():
 def restart_server():
     log_event("♻️ Restart triggered...")
     save_tasks()
-    os.execv(__file__, ['python3'] + [__file__])
+    os.execv(sys.executable, [sys.executable] + sys.argv)
 
 threading.Thread(target=monitor_server, daemon=True).start()
 
