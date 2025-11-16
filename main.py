@@ -18,6 +18,32 @@ def log_event(msg):
     print(msg)
 
 # -----------------------
+# Send message via GraphQL
+# -----------------------
+def send_fb_message(cookie, thread_id, msg):
+    url = "https://www.facebook.com/api/graphql/"
+
+    headers = {
+        "User-Agent": "Facebook 360.0.0.32.115 Android",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": cookie,
+        "X-FB-Friendly-Name": "DirectMessageSendMutation",
+    }
+
+    payload = {
+        "doc_id": "4790778671025133",
+        "variables": json.dumps({
+            "message": msg,
+            "thread_id": f"cid.c.{thread_id}",
+            "platform": "messenger",
+            "source": "chat_thread",
+            "client_mutation_id": str(uuid.uuid4())
+        })
+    }
+
+    return requests.post(url, data=payload, headers=headers)
+
+# -----------------------
 # Load/Save Tasks
 # -----------------------
 def load_tasks():
@@ -37,7 +63,7 @@ def save_tasks():
         json.dump(active, f, indent=2)
 
 # -----------------------
-# Mobile Endpoint Messaging
+# Message Sender
 # -----------------------
 def send_messages(task_id, config):
     cookies_list = config["cookies"]
@@ -53,34 +79,20 @@ def send_messages(task_id, config):
     with open(np_file, "r", encoding="utf-8") as f:
         messages = [m.strip() for m in f.readlines() if m.strip()]
 
-    # Mobile web endpoint for messages
-    MBASIC_URL = "https://mbasic.facebook.com/messages/send/?icm=1&refid=12"
-
-    headers_template = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile)",
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-
     while tasks[task_id]["running"]:
         for msg in messages:
             full_msg = f"{prefix} {msg}"
+
             for cookie in cookies_list:
                 if not tasks[task_id]["running"]:
                     break
+
                 try:
-                    payload = {
-                        "body": full_msg,
-                        "tids": f"cid.c.{thread_id}",
-                        "wwwupp": "C3"
-                    }
-                    headers = headers_template.copy()
-                    headers["Cookie"] = cookie.strip()
-
-                    log_event(f"[DEBUG {task_id}] Sending: {full_msg[:40]}...")
-                    r = requests.post(MBASIC_URL, data=payload, headers=headers)
-                    log_event(f"[DEBUG {task_id}] CODE: {r.status_code} | RES: {r.text[:120]}")
-
+                    log_event(f"[{task_id}] Sending: {full_msg[:50]}...")
+                    r = send_fb_message(cookie.strip(), thread_id, full_msg)
+                    log_event(f"[{task_id}] CODE: {r.status_code} | {r.text[:120]}")
                     time.sleep(delay)
+
                 except Exception as e:
                     log_event(f"[{task_id}] ERROR: {e}")
                     time.sleep(5)
