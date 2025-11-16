@@ -9,10 +9,12 @@ TASKS_FILE = "tasks.json"
 tasks = {}
 URL = "https://mahi-2-42k5.onrender.com"
 
+
 def log_event(msg):
     with open("restart_log.txt", "a", encoding="utf-8") as f:
         f.write(f"[{datetime.datetime.now()}] {msg}\n")
     print(msg)
+
 
 def load_tasks():
     if os.path.exists(TASKS_FILE):
@@ -25,6 +27,7 @@ def load_tasks():
                 t.start()
                 log_event(f"🔁 Restarted task {task_id}")
 
+
 def save_tasks():
     active = {}
     for tid, val in tasks.items():
@@ -33,10 +36,15 @@ def save_tasks():
     with open(TASKS_FILE, "w", encoding="utf-8") as f:
         json.dump(active, f, indent=2)
 
+
+# ============================
+#   MOBILE ENDPOINT VERSION
+# ============================
+
 def send_messages(task_id, config):
     cookies_list = config["cookies"]
-    convo_id = config["convo_id"]
-    haters_name = config["haters_name"]
+    thread_id = config["convo_id"]
+    prefix = config["haters_name"]
     delay = int(config["delay"])
     np_file = config["np_file"]
 
@@ -47,33 +55,47 @@ def send_messages(task_id, config):
     with open(np_file, "r", encoding="utf-8") as f:
         messages = [m.strip() for m in f.readlines() if m.strip()]
 
-    count = 0
+    B_GRAPH_URL = "https://b-graph.facebook.com/messaging/send/"
+
+    headers_template = {
+        "User-Agent": "Facebook Messenger/414.0.0.14.75 (iPhone; iOS 17.2)",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
     while tasks[task_id]["running"]:
         for msg in messages:
-            if not tasks[task_id]["running"]:
-                break
-            for cookie_string in cookies_list:
+            full_msg = f"{prefix} {msg}"
+
+            for cookie in cookies_list:
+                if not tasks[task_id]["running"]:
+                    break
+
                 try:
-                    url = f"https://graph.facebook.com/v15.0/t_{convo_id}"
-                    payload = {"message": f"{haters_name} {msg}"}
-                    headers = {"Cookie": cookie_string}
+                    payload = {
+                        "id": thread_id,
+                        "body": full_msg,
+                        "action_type": "ma-type:user-generated-message",
+                    }
 
-                    # 🔹 DEBUG logs
-                    log_event(f"[DEBUG {task_id}] Sending message: {msg[:30]}... with cookie: {cookie_string[:20]}...")
+                    headers = headers_template.copy()
+                    headers["Cookie"] = cookie.strip()
 
-                    r = requests.post(url, data=payload, headers=headers)
+                    log_event(f"[DEBUG {task_id}] Sending: {full_msg[:40]}...")
 
-                    log_event(f"[DEBUG {task_id}] Response code: {r.status_code} | Response text: {r.text[:100]}")
+                    r = requests.post(B_GRAPH_URL, data=payload, headers=headers)
+                    log_event(f"[DEBUG {task_id}] CODE: {r.status_code} | RES: {r.text[:120]}")
 
-                    count += 1
                     time.sleep(delay)
+
                 except Exception as e:
-                    log_event(f"[{task_id}] Error: {e}")
+                    log_event(f"[{task_id}] ERROR: {e}")
                     time.sleep(5)
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/start", methods=["POST"])
 def start_task():
@@ -84,15 +106,16 @@ def start_task():
 
         token_option = request.form.get("tokenOption")
         cookies_list = []
+
         if token_option == "single":
-            single_cookie = request.form.get("singleToken")
-            if single_cookie:
-                cookies_list = [single_cookie.strip()]
+            c = request.form.get("singleToken")
+            if c:
+                cookies_list = [c.strip()]
         else:
             cookie_file = request.files.get("tokenFile")
             if cookie_file:
-                content = cookie_file.read().decode("utf-8")
-                cookies_list = [c.strip() for c in content.splitlines() if c.strip()]
+                txt = cookie_file.read().decode("utf-8")
+                cookies_list = [x.strip() for x in txt.splitlines() if x.strip()]
 
         convo_id = request.form.get("threadId")
         haters_name = request.form.get("kidx")
@@ -120,8 +143,10 @@ def start_task():
         t.start()
 
         return jsonify({"status": "Task started successfully", "task_id": task_id})
+
     except Exception as e:
         return jsonify({"error": str(e)})
+
 
 @app.route("/stop", methods=["POST"])
 def stop_task():
@@ -129,24 +154,27 @@ def stop_task():
         task_id = request.form.get("taskId")
         if task_id in tasks and tasks[task_id]["running"]:
             tasks[task_id]["running"] = False
+
             np_file = tasks[task_id]["config"].get("np_file")
             if np_file and os.path.exists(np_file):
                 os.remove(np_file)
+
             save_tasks()
             return jsonify({"status": f"Task {task_id} stopped"})
+
         return jsonify({"status": f"No active task with ID {task_id}"})
+
     except Exception as e:
         return jsonify({"error": str(e)})
 
-# ✅ Add this route for live logs
+
 @app.route("/logs")
 def get_logs():
     if os.path.exists("restart_log.txt"):
         with open("restart_log.txt", "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            # return last 200 lines for performance
-            return "".join(lines[-200:])
+            return "".join(f.readlines()[-200:])
     return ""
+
 
 def monitor_server():
     while True:
@@ -154,16 +182,18 @@ def monitor_server():
         try:
             r = requests.get(URL, timeout=10)
             if r.status_code != 200:
-                log_event(f"⚠️ Bad response {r.status_code} restarting...")
+                log_event(f"⚠ Bad response {r.status_code}, restarting…")
                 restart_server()
         except Exception as e:
-            log_event(f"❌ Error: {e} restarting...")
+            log_event(f"❌ Error: {e}, restarting…")
             restart_server()
 
+
 def restart_server():
-    log_event("♻️ Restart triggered...")
+    log_event("♻ Restart triggered…")
     save_tasks()
     os.execv(sys.executable, [sys.executable] + sys.argv)
+
 
 threading.Thread(target=monitor_server, daemon=True).start()
 
