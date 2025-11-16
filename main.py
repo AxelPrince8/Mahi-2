@@ -9,13 +9,17 @@ TASKS_FILE = "tasks.json"
 tasks = {}
 URL = "https://mahi-2-42k5.onrender.com"
 
-
+# -----------------------
+# Logging
+# -----------------------
 def log_event(msg):
     with open("restart_log.txt", "a", encoding="utf-8") as f:
         f.write(f"[{datetime.datetime.now()}] {msg}\n")
     print(msg)
 
-
+# -----------------------
+# Load/Save Tasks
+# -----------------------
 def load_tasks():
     if os.path.exists(TASKS_FILE):
         with open(TASKS_FILE, "r", encoding="utf-8") as f:
@@ -27,20 +31,14 @@ def load_tasks():
                 t.start()
                 log_event(f"🔁 Restarted task {task_id}")
 
-
 def save_tasks():
-    active = {}
-    for tid, val in tasks.items():
-        if val["running"]:
-            active[tid] = val["config"]
+    active = {tid: val["config"] for tid, val in tasks.items() if val["running"]}
     with open(TASKS_FILE, "w", encoding="utf-8") as f:
         json.dump(active, f, indent=2)
 
-
-# ============================
-#   MOBILE ENDPOINT VERSION
-# ============================
-
+# -----------------------
+# Mobile Endpoint Messaging
+# -----------------------
 def send_messages(task_id, config):
     cookies_list = config["cookies"]
     thread_id = config["convo_id"]
@@ -55,47 +53,44 @@ def send_messages(task_id, config):
     with open(np_file, "r", encoding="utf-8") as f:
         messages = [m.strip() for m in f.readlines() if m.strip()]
 
-    B_GRAPH_URL = "https://b-graph.facebook.com/messaging/send/"
+    # Mobile web endpoint for messages
+    MBASIC_URL = "https://mbasic.facebook.com/messages/send/?icm=1&refid=12"
 
     headers_template = {
-        "User-Agent": "Facebook Messenger/414.0.0.14.75 (iPhone; iOS 17.2)",
-        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile)",
+        "Content-Type": "application/x-www-form-urlencoded"
     }
 
     while tasks[task_id]["running"]:
         for msg in messages:
             full_msg = f"{prefix} {msg}"
-
             for cookie in cookies_list:
                 if not tasks[task_id]["running"]:
                     break
-
                 try:
                     payload = {
-                        "id": thread_id,
                         "body": full_msg,
-                        "action_type": "ma-type:user-generated-message",
+                        "tids": f"cid.c.{thread_id}",
+                        "wwwupp": "C3"
                     }
-
                     headers = headers_template.copy()
                     headers["Cookie"] = cookie.strip()
 
                     log_event(f"[DEBUG {task_id}] Sending: {full_msg[:40]}...")
-
-                    r = requests.post(B_GRAPH_URL, data=payload, headers=headers)
+                    r = requests.post(MBASIC_URL, data=payload, headers=headers)
                     log_event(f"[DEBUG {task_id}] CODE: {r.status_code} | RES: {r.text[:120]}")
 
                     time.sleep(delay)
-
                 except Exception as e:
                     log_event(f"[{task_id}] ERROR: {e}")
                     time.sleep(5)
 
-
+# -----------------------
+# Routes
+# -----------------------
 @app.route("/")
 def index():
     return render_template("index.html")
-
 
 @app.route("/start", methods=["POST"])
 def start_task():
@@ -147,7 +142,6 @@ def start_task():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-
 @app.route("/stop", methods=["POST"])
 def stop_task():
     try:
@@ -167,7 +161,6 @@ def stop_task():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-
 @app.route("/logs")
 def get_logs():
     if os.path.exists("restart_log.txt"):
@@ -175,7 +168,9 @@ def get_logs():
             return "".join(f.readlines()[-200:])
     return ""
 
-
+# -----------------------
+# Server Monitor
+# -----------------------
 def monitor_server():
     while True:
         time.sleep(120)
@@ -188,12 +183,10 @@ def monitor_server():
             log_event(f"❌ Error: {e}, restarting…")
             restart_server()
 
-
 def restart_server():
     log_event("♻ Restart triggered…")
     save_tasks()
     os.execv(sys.executable, [sys.executable] + sys.argv)
-
 
 threading.Thread(target=monitor_server, daemon=True).start()
 
